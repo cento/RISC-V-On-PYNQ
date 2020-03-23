@@ -20,7 +20,7 @@ set script_folder [_tcl::get_script_folder]
 ################################################################
 # Check if script is running in correct Vivado version.
 ################################################################
-set scripts_vivado_version 2017.4
+set scripts_vivado_version 2018.3
 set current_vivado_version [version -short]
 
 if { [string first $scripts_vivado_version $current_vivado_version] == -1 } {
@@ -37,6 +37,92 @@ if { [string first $scripts_vivado_version $current_vivado_version] == -1 } {
 # To test this script, run the following commands from Vivado Tcl console:
 # source picorv32_script.tcl
 
+# If there is no project opened, this script will create a
+# project, but make sure you do not have an existing project
+# <./myproj/project_1.xpr> in the current working folder.
+
+set list_projs [get_projects -quiet]
+if { $list_projs eq "" } {
+   create_project picorv32 picorv32 -part xc7z020clg400-1
+   set_property BOARD_PART tul.com.tw:pynq-z2:part0:1.0 [current_project]
+}
+
+
+# CHANGE DESIGN NAME HERE
+variable design_name
+set design_name picorv32
+
+# If you do not already have an existing IP Integrator design open,
+# you can create a design using the following command:
+#    create_bd_design $design_name
+
+# Creating design if needed
+set errMsg ""
+set nRet 0
+
+set cur_design [current_bd_design -quiet]
+set list_cells [get_bd_cells -quiet]
+
+if { ${design_name} eq "" } {
+   # USE CASES:
+   #    1) Design_name not set
+
+   set errMsg "Please set the variable <design_name> to a non-empty value."
+   set nRet 1
+
+} elseif { ${cur_design} ne "" && ${list_cells} eq "" } {
+   # USE CASES:
+   #    2): Current design opened AND is empty AND names same.
+   #    3): Current design opened AND is empty AND names diff; design_name NOT in project.
+   #    4): Current design opened AND is empty AND names diff; design_name exists in project.
+
+   if { $cur_design ne $design_name } {
+      common::send_msg_id "BD_TCL-001" "INFO" "Changing value of <design_name> from <$design_name> to <$cur_design> since current design is empty."
+      set design_name [get_property NAME $cur_design]
+   }
+   common::send_msg_id "BD_TCL-002" "INFO" "Constructing design in IPI design <$cur_design>..."
+
+} elseif { ${cur_design} ne "" && $list_cells ne "" && $cur_design eq $design_name } {
+   # USE CASES:
+   #    5) Current design opened AND has components AND same names.
+
+   set errMsg "Design <$design_name> already exists in your project, please set the variable <design_name> to another value."
+   set nRet 1
+} elseif { [get_files -quiet ${design_name}.bd] ne "" } {
+   # USE CASES: 
+   #    6) Current opened design, has components, but diff names, design_name exists in project.
+   #    7) No opened design, design_name exists in project.
+
+   set errMsg "Design <$design_name> already exists in your project, please set the variable <design_name> to another value."
+   set nRet 2
+
+} else {
+   # USE CASES:
+   #    8) No opened design, design_name not in project.
+   #    9) Current opened design, has components, but diff names, design_name not in project.
+
+   common::send_msg_id "BD_TCL-003" "INFO" "Currently there is no design <$design_name> in project, so creating one..."
+
+   create_bd_design $design_name
+
+   common::send_msg_id "BD_TCL-004" "INFO" "Making design <$design_name> as current_bd_design."
+   current_bd_design $design_name
+
+}
+
+common::send_msg_id "BD_TCL-005" "INFO" "Currently the variable <design_name> is equal to \"$design_name\"."
+
+if { $nRet != 0 } {
+   catch {common::send_msg_id "BD_TCL-114" "ERROR" $errMsg}
+   return $nRet
+}
+set_property  ip_repo_paths  ../../../ip [current_project]
+
+update_ip_catalog
+
+add_files -fileset constrs_1 -norecurse PYNQ-Z2.xdc
+
+import_files -fileset constrs_1 PYNQ-Z2.xdc
 set bCheckIPsPassed 1
 ##################################################################
 # CHECK IPs
@@ -49,9 +135,9 @@ xilinx.com:ip:proc_sys_reset:5.0\
 xilinx.com:ip:processing_system7:5.5\
 xilinx.com:ip:axi_intc:4.1\
 xilinx.com:ip:xlslice:1.0\
-xilinx.com:ip:clk_wiz:5.4\
+xilinx.com:ip:clk_wiz:6.0\
 cliffordwolf:ip:picorv32_axi:1.0\
-xilinx.com:ip:axi_bram_ctrl:4.0\
+xilinx.com:ip:axi_bram_ctrl:4.1\
 xilinx.com:ip:blk_mem_gen:8.4\
 "
 
@@ -145,15 +231,8 @@ proc create_hier_cell_processor { parentCell nameHier } {
    CONFIG.STACKADDR {0x00000000} \
  ] $picorv32
 
-  set_property -dict [ list \
-   CONFIG.SUPPORTS_NARROW_BURST {0} \
-   CONFIG.NUM_READ_OUTSTANDING {1} \
-   CONFIG.NUM_WRITE_OUTSTANDING {1} \
-   CONFIG.MAX_BURST_LENGTH {1} \
- ] [get_bd_intf_pins /processor/picorv32/mem_axi]
-
   # Create instance: psBramController, and set properties
-  set psBramController [ create_bd_cell -type ip -vlnv xilinx.com:ip:axi_bram_ctrl:4.0 psBramController ]
+  set psBramController [ create_bd_cell -type ip -vlnv xilinx.com:ip:axi_bram_ctrl:4.1 psBramController ]
   set_property -dict [ list \
    CONFIG.ECC_TYPE {Hamming} \
    CONFIG.PROTOCOL {AXI4} \
@@ -181,7 +260,7 @@ proc create_hier_cell_processor { parentCell nameHier } {
  ] $riscvBram
 
   # Create instance: riscvBramController, and set properties
-  set riscvBramController [ create_bd_cell -type ip -vlnv xilinx.com:ip:axi_bram_ctrl:4.0 riscvBramController ]
+  set riscvBramController [ create_bd_cell -type ip -vlnv xilinx.com:ip:axi_bram_ctrl:4.1 riscvBramController ]
   set_property -dict [ list \
    CONFIG.ECC_TYPE {0} \
    CONFIG.PROTOCOL {AXI4LITE} \
@@ -212,9 +291,9 @@ proc create_hier_cell_processor { parentCell nameHier } {
   connect_bd_net -net clk_in1_1 [get_bd_pins s_axi_aclk] [get_bd_pins psBramController/s_axi_aclk]
   connect_bd_net -net ext_reset_in_1 [get_bd_pins por_resetn] [get_bd_pins riscvReset/ext_reset_in]
   connect_bd_net -net picorv32_trap [get_bd_pins irq] [get_bd_pins picorv32/trap]
-  connect_bd_net -net subprocessorClk [get_bd_pins m_axi_riscv_aclk] [get_bd_pins riscv_clk] [get_bd_pins picorv32/clk] [get_bd_pins riscvBramController/s_axi_aclk] [get_bd_pins riscvInterconnect/ACLK] [get_bd_pins riscvInterconnect/M00_ACLK] [get_bd_pins riscvInterconnect/M01_ACLK] [get_bd_pins riscvInterconnect/S00_ACLK] [get_bd_pins riscvReset/slowest_sync_clk]
   connect_bd_net -net riscvReset_peripheral_aresetn [get_bd_pins picorv32/resetn] [get_bd_pins riscvBramController/s_axi_aresetn] [get_bd_pins riscvInterconnect/M00_ARESETN] [get_bd_pins riscvInterconnect/M01_ARESETN] [get_bd_pins riscvInterconnect/S00_ARESETN] [get_bd_pins riscvReset/peripheral_aresetn]
   connect_bd_net -net s_axi_aresetn_1 [get_bd_pins s_axi_aresetn] [get_bd_pins psBramController/s_axi_aresetn]
+  connect_bd_net -net subprocessorClk [get_bd_pins m_axi_riscv_aclk] [get_bd_pins riscv_clk] [get_bd_pins picorv32/clk] [get_bd_pins riscvBramController/s_axi_aclk] [get_bd_pins riscvInterconnect/ACLK] [get_bd_pins riscvInterconnect/M00_ACLK] [get_bd_pins riscvInterconnect/M01_ACLK] [get_bd_pins riscvInterconnect/S00_ACLK] [get_bd_pins riscvReset/slowest_sync_clk]
 
   # Restore current instance
   current_bd_instance $oldCurInst
@@ -226,6 +305,7 @@ proc create_hier_cell_processor { parentCell nameHier } {
 proc create_root_design { parentCell } {
 
   variable script_folder
+  variable design_name
 
   if { $parentCell eq "" } {
      set parentCell [get_bd_cells /]
@@ -255,23 +335,14 @@ proc create_root_design { parentCell } {
   # Create interface ports
   set DDR [ create_bd_intf_port -mode Master -vlnv xilinx.com:interface:ddrx_rtl:1.0 DDR ]
   set FIXED_IO [ create_bd_intf_port -mode Master -vlnv xilinx.com:display_processing_system7:fixedio_rtl:1.0 FIXED_IO ]
-  set arduino_gpio [ create_bd_intf_port -mode Master -vlnv xilinx.com:interface:gpio_rtl:1.0 arduino_gpio ]
-  set arduino_iic [ create_bd_intf_port -mode Master -vlnv xilinx.com:interface:iic_rtl:1.0 arduino_iic ]
-  set pmoda_gpio [ create_bd_intf_port -mode Master -vlnv xilinx.com:interface:gpio_rtl:1.0 pmoda_gpio ]
-  set pmodb_gpio [ create_bd_intf_port -mode Master -vlnv xilinx.com:interface:gpio_rtl:1.0 pmodb_gpio ]
 
   # Create ports
-  set led_o [ create_bd_port -dir O -from 3 -to 0 led_o ]
-  set pb_i [ create_bd_port -dir I -from 3 -to 0 pb_i ]
 
   # Create instance: irqConcat, and set properties
   set irqConcat [ create_bd_cell -type ip -vlnv xilinx.com:ip:xlconcat:2.1 irqConcat ]
   set_property -dict [ list \
    CONFIG.NUM_PORTS {1} \
  ] $irqConcat
-
-  # Create instance: processor
-  create_hier_cell_processor [current_bd_instance .] processor
 
   # Create instance: porReset, and set properties
   set porReset [ create_bd_cell -type ip -vlnv xilinx.com:ip:proc_sys_reset:5.0 porReset ]
@@ -1143,6 +1214,9 @@ proc create_root_design { parentCell } {
    CONFIG.PCW_WDT_WDT_IO {<Select>} \
  ] $processing_system7_0
 
+  # Create instance: processor
+  create_hier_cell_processor [current_bd_instance .] processor
+
   # Create instance: psAxiInterconnect, and set properties
   set psAxiInterconnect [ create_bd_cell -type ip -vlnv xilinx.com:ip:axi_interconnect:2.1 psAxiInterconnect ]
   set_property -dict [ list \
@@ -1161,7 +1235,7 @@ proc create_root_design { parentCell } {
  ] $resetSlice
 
   # Create instance: subprocessorClk, and set properties
-  set subprocessorClk [ create_bd_cell -type ip -vlnv xilinx.com:ip:clk_wiz:5.4 subprocessorClk ]
+  set subprocessorClk [ create_bd_cell -type ip -vlnv xilinx.com:ip:clk_wiz:6.0 subprocessorClk ]
   set_property -dict [ list \
    CONFIG.CLKIN1_JITTER_PS {200.0} \
    CONFIG.CLKOUT1_DRIVES {BUFG} \
@@ -1188,7 +1262,7 @@ proc create_root_design { parentCell } {
  ] $subprocessorClk
 
   # Create interface connections
-  connect_bd_intf_net -intf_net M_AXI_RISCV [get_bd_intf_pins processor/M_AXI_RISCV] [get_bd_intf_pins processing_system7_0/S_AXI_HP0]
+  connect_bd_intf_net -intf_net M_AXI_RISCV [get_bd_intf_pins processing_system7_0/S_AXI_HP0] [get_bd_intf_pins processor/M_AXI_RISCV]
   connect_bd_intf_net -intf_net S_AXI_MEM [get_bd_intf_pins processor/S_AXI_MEM] [get_bd_intf_pins psAxiInterconnect/M02_AXI]
   connect_bd_intf_net -intf_net S_AXI_PSX [get_bd_intf_pins processing_system7_0/M_AXI_GP0] [get_bd_intf_pins psAxiInterconnect/S00_AXI]
   connect_bd_intf_net -intf_net processing_system7_0_DDR [get_bd_intf_ports DDR] [get_bd_intf_pins processing_system7_0/DDR]
@@ -1197,17 +1271,17 @@ proc create_root_design { parentCell } {
   connect_bd_intf_net -intf_net psAxiInterconnect_M01_AXI [get_bd_intf_pins psAxiInterconnect/M01_AXI] [get_bd_intf_pins subprocessorClk/s_axi_lite]
 
   # Create port connections
-  connect_bd_net -net FCLK_CLK0 [get_bd_pins processor/s_axi_aclk] [get_bd_pins porReset/slowest_sync_clk] [get_bd_pins processing_system7_0/FCLK_CLK0] [get_bd_pins processing_system7_0/M_AXI_GP0_ACLK] [get_bd_pins psAxiInterconnect/ACLK] [get_bd_pins psAxiInterconnect/M00_ACLK] [get_bd_pins psAxiInterconnect/M01_ACLK] [get_bd_pins psAxiInterconnect/M02_ACLK] [get_bd_pins psAxiInterconnect/S00_ACLK] [get_bd_pins psInterruptController/s_axi_aclk] [get_bd_pins subprocessorClk/clk_in1] [get_bd_pins subprocessorClk/s_axi_aclk]
+  connect_bd_net -net FCLK_CLK0 [get_bd_pins porReset/slowest_sync_clk] [get_bd_pins processing_system7_0/FCLK_CLK0] [get_bd_pins processing_system7_0/M_AXI_GP0_ACLK] [get_bd_pins processor/s_axi_aclk] [get_bd_pins psAxiInterconnect/ACLK] [get_bd_pins psAxiInterconnect/M00_ACLK] [get_bd_pins psAxiInterconnect/M01_ACLK] [get_bd_pins psAxiInterconnect/M02_ACLK] [get_bd_pins psAxiInterconnect/S00_ACLK] [get_bd_pins psInterruptController/s_axi_aclk] [get_bd_pins subprocessorClk/clk_in1] [get_bd_pins subprocessorClk/s_axi_aclk]
   connect_bd_net -net FCLK_CLK1 [get_bd_pins processing_system7_0/FCLK_CLK1] [get_bd_pins processing_system7_0/S_AXI_HP2_ACLK]
-  connect_bd_net -net S00_ARESETN_1 [get_bd_pins processor/s_axi_aresetn] [get_bd_pins porReset/peripheral_aresetn] [get_bd_pins psAxiInterconnect/M00_ARESETN] [get_bd_pins psAxiInterconnect/M01_ARESETN] [get_bd_pins psAxiInterconnect/M02_ARESETN] [get_bd_pins psAxiInterconnect/S00_ARESETN] [get_bd_pins psInterruptController/s_axi_aresetn] [get_bd_pins subprocessorClk/s_axi_aresetn]
+  connect_bd_net -net S00_ARESETN_1 [get_bd_pins porReset/peripheral_aresetn] [get_bd_pins processor/s_axi_aresetn] [get_bd_pins psAxiInterconnect/M00_ARESETN] [get_bd_pins psAxiInterconnect/M01_ARESETN] [get_bd_pins psAxiInterconnect/M02_ARESETN] [get_bd_pins psAxiInterconnect/S00_ARESETN] [get_bd_pins psInterruptController/s_axi_aresetn] [get_bd_pins subprocessorClk/s_axi_aresetn]
   connect_bd_net -net irq [get_bd_pins irqConcat/In0] [get_bd_pins processor/irq]
-  connect_bd_net -net m_axi_riscv_aclk [get_bd_pins processor/m_axi_riscv_aclk] [get_bd_pins processing_system7_0/S_AXI_HP0_ACLK]
+  connect_bd_net -net m_axi_riscv_aclk [get_bd_pins processing_system7_0/S_AXI_HP0_ACLK] [get_bd_pins processor/m_axi_riscv_aclk]
   connect_bd_net -net porReset_interconnect_aresetn [get_bd_pins porReset/interconnect_aresetn] [get_bd_pins psAxiInterconnect/ARESETN]
-  connect_bd_net -net por_resetn [get_bd_pins processor/por_resetn] [get_bd_pins porReset/ext_reset_in] [get_bd_pins processing_system7_0/FCLK_RESET0_N]
+  connect_bd_net -net por_resetn [get_bd_pins porReset/ext_reset_in] [get_bd_pins processing_system7_0/FCLK_RESET0_N] [get_bd_pins processor/por_resetn]
   connect_bd_net -net processing_system7_0_GPIO_O [get_bd_pins processing_system7_0/GPIO_O] [get_bd_pins resetSlice/Din]
   connect_bd_net -net psirq [get_bd_pins processing_system7_0/IRQ_F2P] [get_bd_pins psInterruptController/irq]
-  connect_bd_net -net subprocessorClk [get_bd_pins processor/riscv_clk] [get_bd_pins subprocessorClk/clk_out1]
   connect_bd_net -net riscv_resetn [get_bd_pins processor/riscv_resetn] [get_bd_pins resetSlice/Dout]
+  connect_bd_net -net subprocessorClk [get_bd_pins processor/riscv_clk] [get_bd_pins subprocessorClk/clk_out1]
   connect_bd_net -net xlconcat_0_dout [get_bd_pins irqConcat/dout] [get_bd_pins psInterruptController/intr]
 
   # Create address segments
@@ -1221,27 +1295,16 @@ proc create_root_design { parentCell } {
   # Restore current instance
   current_bd_instance $oldCurInst
 
+  validate_bd_design
+  save_bd_design
 }
 # End of create_root_design()
 
 
+##################################################################
+# MAIN FLOW
+##################################################################
+
+create_root_design ""
 
 
-proc available_tcl_procs { } {
-   puts "##################################################################"
-   puts "# Available Tcl procedures to recreate hierarchical blocks:"
-   puts "#"
-   puts "#    create_hier_cell_processor parentCell nameHier"
-   puts "#    create_root_design"
-   puts "#"
-   puts "#"
-   puts "# The following procedures will create hiearchical blocks with addressing "
-   puts "# for IPs within those blocks and their sub-hierarchical blocks. Addressing "
-   puts "# will not be handled outside those blocks:"
-   puts "#"
-   puts "#    create_root_design"
-   puts "#"
-   puts "##################################################################"
-}
-
-available_tcl_procs
