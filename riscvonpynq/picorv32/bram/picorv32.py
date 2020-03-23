@@ -71,7 +71,7 @@ class Processor(BramProcessor):
     in __get_path.
 
     """
-    _name = 'picoBramProcessor'
+    _name = 'processor'
     _proc = 'picorv32'
     _bits = 32
 

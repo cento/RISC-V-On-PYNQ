@@ -72,7 +72,7 @@ class Processor(MixedProcessor):
     in __get_path.
 
     """
-    _name = 'picoAxiProcessor'
+    _name = 'processor'
     _proc = 'picorv32'
     _bits = 32
 
