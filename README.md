@@ -5,7 +5,7 @@ from the paper "Everyone's a Critic: A Tool for Evaluating RISC-V
 Projects".
 
 This repository is a python package for the PYNQ 2.1+ distribution on
-the PYNQ-Z1 board. You can install this package by running the following command: 
+the PYNQ-Z1/Z2 board. You can install this package by running the following command: 
 
 ``` bash
 
