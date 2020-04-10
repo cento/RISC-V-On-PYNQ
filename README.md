@@ -5,7 +5,7 @@ from the paper "Everyone's a Critic: A Tool for Evaluating RISC-V
 Projects".
 
 This repository is a python package for the PYNQ 2.4 distribution on
-the PYNQ-Z1/Z2 board. You can install this package by running the following command: 
+the PYNQ-Z2 board. You can install this package by running the following command: 
 
 ``` bash
 
@@ -62,7 +62,7 @@ overlays. There are five notebooks:
 
 Completing these notebooks require:
 
-1. A PYNQ-Z1 with a 16 GB MicroSD Card
+1. A PYNQ-Z2 with a 16 GB MicroSD Card
 2. A Host (Windows or Linux) with Vivado 2018.3
 3. An Internet Connection on both computers
 
