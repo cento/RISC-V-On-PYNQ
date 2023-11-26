@@ -9,7 +9,7 @@ the PYNQ-Z2 board. You can install this package by running the following command
 
 ``` bash
 
-sudo -H pip3 install https://github.com/Siudya/RISC-V-On-PYNQ/
+sudo -H pip install --upgrade git+https://github.com/cento/RISC-V-On-PYNQ/
 
 ```
 
