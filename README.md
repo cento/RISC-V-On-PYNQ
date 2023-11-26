@@ -49,6 +49,19 @@ with BRAM and DDR Mixed Memory.
 More examples and demonstrations are available in the notebooks
 installed by this package.
 
+## Github desktop app 
+
+Github desktop app does not support submodule recursive cloning.
+After cloning the repository, use this:
+
+    git submodule update --init --recursivve
+    git checkout master
+
+After that, we can update the submodule:
+
+    git submodule foreach --recursive git fetch
+    git submodule foreach git merge origin master
+
 ## RISC-V-Tutorial Notebooks
 
 The RISC-V Tutorial Notebooks are a set of notebooks describing how to
