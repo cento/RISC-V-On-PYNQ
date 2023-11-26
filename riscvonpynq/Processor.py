@@ -33,7 +33,7 @@
 # DAMAGE.
 # ----------------------------------------------------------------------
 import pynq, os, enum, numpy as np, time
-from pynq import Xlnk
+from pynq import buffer
 
 __author__ = "Dustin Richmond"
 __copyright__ = "Copyright 2018, The Regents of the University of California"
@@ -299,7 +299,7 @@ class Processor(pynq.DefaultHierarchy):
         """        
         self._validate(*args)        
         for (dest, src) in zip(args, arg_bufs):
-            if isinstance(dest, pynq.xlnk.ContiguousArray):
+            if isinstance(dest, pynq.buffer.ContiguousArray):
                 pass
             elif(isinstance(dest, np.ndarray)):
                 np.copyto(dest, src)
@@ -338,7 +338,7 @@ class MixedProcessor(Processor):
 
         """
         super().__init__(build_path, reset_value, description, *args)
-        self.__xlnk = Xlnk()        
+        self.__buffer = buffer()        
 
     def _dealloc_args(self, arg_bufs, args, argv_buf):
         """Dealloc any CMA Arrays allocated by this class, but do not
@@ -354,18 +354,18 @@ class MixedProcessor(Processor):
             Tuple of np.ndarrays with argument data in the PS memory
             space.
 
-        argv_buf : pynq.xlnk.ContiguousArray
+        argv_buf : pynq.buffer.ContiguousArray
             Buffer containing pointers to each buffer in arg_bufs
 
         Note
         ----
         If a buffer in args is an instance of
-        pynq.xlnk.ContiguousArray this means it was allocated by the
+        pynq.buffer.ContiguousArray this means it was allocated by the
         user and will not be deallocated
 
         """
         self._validate(*args)
-        [ None if isinstance(a, pynq.xlnk.ContiguousArray)
+        [ None if isinstance(a, pynq.buffer.ContiguousArray)
           else cma.freebuffer()
           for (cma, a) in zip(arg_bufs, args) ]
         argv_buf.freebuffer()
@@ -382,21 +382,21 @@ class MixedProcessor(Processor):
         Note
         ----
         If a buffer in args is an instance of
-        pynq.xlnk.ContiguousArray this means it was allocated by the
+        pynq.buffer.ContiguousArray this means it was allocated by the
         user and will not be allocated/copied
 
         """        
         self._validate(*args)
-        arg_bufs = [a if isinstance(a, pynq.xlnk.ContiguousArray)
-                     else (self.__xlnk.cma_array(1, a.dtype) if isinstance(a, np.generic)
-                           else self.__xlnk.cma_array(a.shape, a.dtype))
+        arg_bufs = [a if isinstance(a, pynq.buffer.ContiguousArray)
+                     else (self.__buffer.cma_array(1, a.dtype) if isinstance(a, np.generic)
+                           else self.__buffer.cma_array(a.shape, a.dtype))
                      for a in args]
-        [None if isinstance(src, pynq.xlnk.ContiguousArray)
+        [None if isinstance(src, pynq.buffer.ContiguousArray)
          else np.copyto(dest, src) 
          for (dest, src) in zip(arg_bufs, args)]
-        argv_buf = self.__xlnk.cma_array(len(args), np.uint32)
-        argv_ptr = self.__xlnk.cma_get_phy_addr(argv_buf.pointer)
-        arg_ptrs = [self.__xlnk.cma_get_phy_addr(pya.pointer) for pya in arg_bufs]
+        argv_buf = self.__buffer.cma_array(len(args), np.uint32)
+        argv_ptr = self.__buffer.cma_get_phy_addr(argv_buf.pointer)
+        arg_ptrs = [self.__buffer.cma_get_phy_addr(pya.pointer) for pya in arg_bufs]
         argv_buf[:] = arg_ptrs
         return (argv_buf, argv_ptr, arg_bufs, arg_ptrs)
 
