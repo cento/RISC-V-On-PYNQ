@@ -32,7 +32,7 @@
 BUILD_PATH=../../
 BOARD_PATH=$(BUILD_PATH)
 IP_PATH=../../../ip/
-BOARD=PYNQ-Z1
+BOARD=PYNQ-Z2
 PART=xc7z020clg400-1
 DESIGN=tutorial
 IPS=picorv32_axi
