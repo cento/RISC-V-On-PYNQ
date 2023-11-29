@@ -76,7 +76,7 @@ overlays. There are five notebooks:
 Completing these notebooks require:
 
 1. A PYNQ-Z2 with a 16 GB MicroSD Card
-2. A Host (Windows or Linux) with Vivado 2018.3
+2. A Host (Windows or Linux) with Vivado 2023.2
 3. An Internet Connection on both computers
 
 ## RISC-V-Demo Notebooks
